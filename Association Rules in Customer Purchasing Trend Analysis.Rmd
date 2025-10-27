@@ -1,0 +1,152 @@
+---
+title: "Association rules in customer purchasing trend analysis"
+author: "Trang Hoang"
+date: "2025-01-12"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    number_sections: false
+    theme: spacelab
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Introduction
+
+Understanding customer preferences and trends is important for businesses to adjust their products, marketing strategies, and overall customer experience. This study analyzes the relationship between factors influencing the purchase frequency of target customer groups by using association rules to determine the purchasing patterns of segment groups.
+
+```{r}
+# Packages & Libraries
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(arulesCBA,arulesViz)
+```
+
+## Data Preparation
+
+The dataset used for this analysis is shopping_trends.csv, which contains information about customer behavior including: age, gender, category,frequency provided by Kaggle (<https://www.kaggle.com/datasets/iamsouravbanerjee/customer-shopping-trends-datasets>)
+
+
+```{r}
+# Import dataset
+```
+
+
+```{r, echo = FALSE}
+setwd("/Users/phuongtrang/Library/Mobile Documents/com~apple~CloudDocs/Unsupervised Learning/Final project/Dataset")
+```
+```{r}
+data<-read.csv("shopping_trends.csv", sep=",", dec=".", header=TRUE) 
+data <- data[-1]
+head(data)
+```
+```{r}
+# Checking data
+dim(data)
+summary(data)
+
+```
+
+## Data Processing
+
+Checking distribution of numeric datas
+```{r}
+ summary(data$Age)
+hist(data$Age, col = "brown",
+     xlab = "Age", ylab = "Number of customer",
+     main = "Histogram of age variable")
+```
+
+```{r}
+summary(data$Purchase.Amount..USD)
+hist(data$Purchase.Amount..USD, col = "blue",
+     xlab = "Purchase.Amount", ylab = "Number of customer",
+     main = "Histogram of Purchase.Amount variable")
+```
+
+```{r}
+summary(data$Previous.Purchases)
+hist(data$Previous.Purchases, col = "green",
+     xlab = "Previous.Purchases", ylab = "Number of customer",
+     main = "Histogram of Previous.Purchases variable")
+```
+
+
+```{r}
+summary(data$Review.Rating)
+hist(data$Previous.Purchases, col = "yellow",
+     xlab = "Review.Rating", ylab = "Number of customer",
+     main = "Histogram of Review.Rating variable")
+```
+
+
+
+```{r}
+# Preparation
+columns_to_factor <- c("Gender", "Item.Purchased", "Category",
+                       "Location", "Size",  "Color", "Season", "Season", 
+                       "Subscription.Status", "Payment.Method", 
+                       "Shipping.Type", "Discount.Applied", 
+                       "Promo.Code.Used", "Preferred.Payment.Method", "Frequency.of.Purchases")
+
+# Eliminate duplication
+columns_to_factor <- unique(columns_to_factor)
+columns_to_factor <- intersect(columns_to_factor, colnames(data))
+
+# Covert columns to factor
+data[columns_to_factor] <- lapply(data[columns_to_factor], factor)
+
+```
+
+```{r}
+med.mdlp <- discretizeDF.supervised(Frequency.of.Purchases ~ ., data = data, method = "mdlp")
+summary(med.mdlp)
+```
+
+Method mdlp do not devide continuous data in a effective way
+
+```{r}
+med.caim <- discretizeDF.supervised(Frequency.of.Purchases ~ ., data = data, method = "caim")
+summary(med.caim)
+```
+With caim method, continuous datas seem to be devided better
+
+```{r}
+# Association rules with support= 3% and confidence 10%
+M2.trans<-transactions(med.caim)
+M2.ass <- mineCARs(Frequency.of.Purchases ~ ., transactions = M2.trans, support = 0.03, confidence = 0.1)
+```
+
+
+```{r}
+# Cleaning rules
+M2.clean <- M2.ass[!is.redundant(M2.ass)]
+M2.clean<-M2.clean[is.significant(M2.clean, M2.trans)]
+M2.clean<-M2.clean[is.maximal(M2.clean)]
+summary(M2.clean)
+```
+
+```{r}
+inspectDT(M2.clean) 
+```
+```{r}
+plot(M2.clean, method="graph", engine="htmlwidget") 
+```
+
+```{r}
+plot(M2.clean, measure=c("support","lift"), shading="confidence")
+
+```
+ 
+## Conclusion and Recommendation
+ 
+ 
+-  The study ended up with about 120 rules that show the complexity and diversity in the behavior of the target customer group
+- With a support level of 3% and a confidence level of 10%, some highlights can be identified from the analysis results as follows:
+  - The group of customers  who shop with high frequency (from weekly to monthly) is a young customer group (22-30) who are not affected by discount programs and membership packages and have a high frequency of past purchases, usually the M size customer group
+  - The group of customers who shop with an average frequency of 3 months/time is usually male, prefers cash payment, this group of customers often wears size L and gives many positive reviews (more than 4/5 rating points)
+  - The group of customers with extremely low purchase frequency (buy only once a quarter or year) has many reasons, the biggest reason is that the group that had a high purchase frequency in the past but had many bad product experiences that cause them to not buy often in the present
+
+
